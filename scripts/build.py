@@ -34,7 +34,7 @@ def link(files_to_link, output_file_name):
             return False
         link_file_str = link_file_str + ' ' + object_file_path
     gpp_cmd = GCC_BIN_PATH + GCC_PREFIX + GPP
-    cmd = '{0} -o {1} -specs=nosys.specs -Wl,--no-eh-frame-hdr,-T{2} -nostartfiles {3}'.format(gpp_cmd, os.path.join(INTERMEDIATE_PATH, output_file_name), LINK_SCRIPT, link_file_str)
+    cmd = '{0} -o {1} -specs=nosys.specs -specs=nano.specs -Wl,--no-eh-frame-hdr,-T{2} -nostartfiles {3}'.format(gpp_cmd, os.path.join(INTERMEDIATE_PATH, output_file_name), LINK_SCRIPT, link_file_str)
     return_code = os.system(cmd)
     return True if return_code == 0 else False
 
@@ -46,20 +46,6 @@ def build(output_file_name):
     return_code = os.system(cmd)
     return True if return_code == 0 else False
 
-def dump(file_name):
-    objdump_cmd = GCC_BIN_PATH + GCC_PREFIX + OBJDUMP
-    ext_name = file_name.split('.')[1]
-    file_dir = ''
-    if ext_name == 'o':
-        file_dir = OBJECT_FILE_DIR
-    elif ext_name == 'elf':
-        file_dir = INTERMEDIATE_PATH
-    else:
-        file_dir = OUT_PATH
-    file_dir = os.path.join(file_dir, file_name)
-    cmd = '{0} -t {1}'.format(objdump_cmd, file_dir)
-    os.system(cmd)
-
 def main():
     parser = argparse.ArgumentParser(description='这是一个示例脚本，演示如何定义自定义指令。')
     parser.add_argument('-c', action='store_true', help='执行编译，有任意文件编译错误将直接停止执行')
@@ -69,7 +55,6 @@ def main():
     parser.add_argument('-lf', action='store_true', help='执行链接，即便链接失败也会继续执行')
     parser.add_argument('-b', action='store_true', help='进行构建并strip')
     parser.add_argument('-o', type=str, default='application', help='设置输出文件名称')
-    parser.add_argument('-d', type=str, default='', help='objdump指定文件')
     parser.add_argument('-clean', action='store_true', help='清空所有中间文件')
 
     args = parser.parse_args()
@@ -77,10 +62,6 @@ def main():
         compile_mode = COMPILATION_MODE_DEFAULT
         file_name = args.ct
         compilation(file_name, compile_mode)
-        return
-    
-    if args.d != '':
-        dump(args.d)
         return
 
     if args.clean:

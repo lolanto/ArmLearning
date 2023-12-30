@@ -1,12 +1,18 @@
 # -*- coding: UTF-8 -*- 
 import os
+import platform
 # 编译器基础配置
-GCC_BIN_PATH='C:/LC\Workplace/STM32/gcc-arm-none-eabi-10.3-2021.10-win32/gcc-arm-none-eabi-10.3-2021.10/bin/'
+GCC_BIN_PATH='/Applications/ARM/bin/'
 GCC_PREFIX='arm-none-eabi-'
-GCC='gcc.exe'
-GPP='g++.exe'
-OBJDUMP='objdump.exe'
-OBJCOPY='objcopy.exe'
+GCC='gcc'
+GPP='g++'
+OBJDUMP='objdump'
+OBJCOPY='objcopy'
+READELF='readelf'
+if platform.system() == "Windows":
+    OBJDUMP += '.exe'
+    OBJCOPY += '.exe'
+    READELF += '.exe'
 
 # 输出环境配置
 INTERMEDIATE_PATH='./intermediate'
@@ -23,3 +29,4 @@ COMPILE_FILES=[('main.cpp', COMPILATION_MODE_FORCE_THUMB), 'App.cpp']
 
 # 烧写相关的配置
 STM32_PROGRAMMER_BIN='C:/LC/Workplace/STM32/CubeProgrammer/bin/STM32_Programmer_CLI.exe'
+
