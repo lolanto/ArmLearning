@@ -19,7 +19,7 @@ public:
         uint32_t* ptr = reinterpret_cast<uint32_t*>(RCC_APB2ENR);
         (*ptr) |= (1 << 4);
     }
-private:
+public:
     RCC() = default;
 };
 

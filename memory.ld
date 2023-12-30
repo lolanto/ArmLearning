@@ -12,6 +12,11 @@ SECTIONS
         . = 0;
         LONG(__reset_stack_pointer);
         LONG(main | 1);
+        LONG(NMIHandler | 1);
+        LONG(HardFaultHandler | 1);
+        LONG(MemoryManagementFaultHandler | 1);
+        LONG(BusFaultHandler | 1);
+        LONG(UsageFaultHandler | 1);
         /* The whole interrupt table is 332 bytes long. Advance to that position. */
         . = 332;
         /* And here comes the rest of the code */
@@ -30,10 +35,6 @@ SECTIONS
     }
     __end__ = .;
     _end = .; PROVIDE (end = .);
-    /* 配置异常处理表，主要是为了定义__exidx_start和end两个符号，至于异常处理机制，暂时不清楚 */
-    .ARM.exidx : {
-      PROVIDE_HIDDEN (__exidx_start = .);
-      *(.ARM.exidx* .gnu.linkonce.armexidx.*)
-      PROVIDE_HIDDEN (__exidx_end = .);
-    }
+    __exidx_start = .;
+    __exidx_end = .;
 }

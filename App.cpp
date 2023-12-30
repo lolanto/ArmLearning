@@ -19,16 +19,16 @@ int App()
 {
     while(1)
     {
-        // GPIO_ODR_REGISTER(GPIO_BLINK_PORT) |= GPIO_ODR_PIN(GPIO_BLINK_NUM);
-        // for(uint32_t i = 0; i < 400000; ++i)
-        // {
-        //     __asm__ volatile("nop");
-        // }
+        GPIO_ODR_REGISTER(GPIO_BLINK_PORT) |= GPIO_ODR_PIN(GPIO_BLINK_NUM);
+        for(uint32_t i = 0; i < 400000; ++i)
+        {
+            __asm__ volatile("nop");
+        }
         GPIO_ODR_REGISTER(GPIO_BLINK_PORT) &= ~GPIO_ODR_PIN(GPIO_BLINK_NUM);
-        // for(uint32_t i = 0; i < 10000; ++i)
-        // {
-        //     __asm__ volatile("nop");
-        // }
+        for(uint32_t i = 0; i < 10000; ++i)
+        {
+            __asm__ volatile("nop");
+        }
     }
 
     return 0;
