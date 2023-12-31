@@ -17,7 +17,7 @@ def compilation(file, mode):
         os.makedirs(OBJECT_FILE_DIR)
     output_file_path = os.path.join(OBJECT_FILE_DIR, '{0}.o'.format(file))
 
-    cmd = '{0} -o {1} -c -g -fno-exceptions -mcpu=cortex-m3 {2} {3}.cpp'.format(gpp_cmd, output_file_path, force_thumb_cmd, file)
+    cmd = '{0} -o {1} -c -g -std=c++17 -fno-exceptions -mcpu=cortex-m3 {2} {3}.cpp'.format(gpp_cmd, output_file_path, force_thumb_cmd, file)
     return_code = os.system(cmd)
     print('Compile file: {0}.cpp {1} {2}'.format(file, 'with Thumb mode' if mode == COMPILATION_MODE_FORCE_THUMB else '', 'Succeed' if return_code == 0 else 'Failed'))
     return True if return_code == 0 else False
