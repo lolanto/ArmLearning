@@ -40,15 +40,43 @@ public:
     GPIO() = delete;
 };
 
+class Flash
+{
+public:
+    static constexpr uint32_t FLASH_ACR_ADDR = 0x40022000u;
+    Flash() = delete;
+};
+
 class RCC
 {
 public:
     // 需要保证以下函数必须正常执行！！！
     static constexpr uint32_t RCC_BASE_ADDR = 0x40021000u;
     static constexpr uint32_t RCC_APB2ENR_REGISTER_ADDR = RCC_BASE_ADDR + 0x18u;
+    // Controll register
+    static constexpr uint32_t RCC_CR_ADDR = RCC_BASE_ADDR + 0x0u;
+    // Clock configuration register
+    static constexpr uint32_t RCC_CFGR_ADDR = RCC_BASE_ADDR + 0x04u;
+    static void InitClock();
     static void DisableAll_RCC_GPIO();
     static void Set_RCC_GPIOGroup(GPIO::PORT_GROUP group, bool enable = true);
     RCC() = delete;
+};
+
+class SysTick
+{
+public:
+    static constexpr uint32_t SYST_REGISTER_BASE_ADDR = 0xE000E010u;
+    // System tick control and status register
+    static constexpr uint32_t SYST_CSR_ADDR = SYST_REGISTER_BASE_ADDR + 0x0u;
+    // System tick reload value register
+    static constexpr uint32_t SYST_RVR_ADDR = SYST_REGISTER_BASE_ADDR + 0x04u;
+    // System tick current value reigster
+    static constexpr uint32_t SYST_CVR_ADDR = SYST_REGISTER_BASE_ADDR + 0x08u;
+    // System tick calibration value register(Read only)
+    static constexpr uint32_t SYST_CALIB_ADDR = SYST_REGISTER_BASE_ADDR + 0x0Cu;
+    
+    static void Delay(uint32_t delayTimeInMS);
 };
 
 #endif // MyHL_H

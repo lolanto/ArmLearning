@@ -6,6 +6,7 @@ int App();
 
 int main()
 {
+    RCC::InitClock();
     RCC::Set_RCC_GPIOGroup(GPIO::PORT_GROUP::PG_A, true);
     GPIO::SetGPIOPortMode(GPIO::PORT_GROUP::PG_A, 1, GPIO::PORT_MODE::PM_OUTPUT_2MHz);
     GPIO::SetGPIOPortValue(GPIO::PORT_GROUP::PG_A, 1, true);

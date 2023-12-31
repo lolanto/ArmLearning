@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <cstdint>
 #include "MyHL.h"
 
@@ -8,15 +9,9 @@ int App()
     while(1)
     {
         GPIO::SetGPIOPortValue(GPIO::PORT_GROUP::PG_C, 13, true);
-        for(uint32_t i = 0; i < 400000; ++i)
-        {
-            __asm__ volatile("nop");
-        }
+        SysTick::Delay(2000);
         GPIO::SetGPIOPortValue(GPIO::PORT_GROUP::PG_C, 13, false);
-        for(uint32_t i = 0; i < 10000; ++i)
-        {
-            __asm__ volatile("nop");
-        }
+        SysTick::Delay(1000);
     }
 
     return 0;
