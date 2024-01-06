@@ -20,7 +20,7 @@ def dump(file_name):
 
 def link_arm_bin():
     if platform.system() == "Darwin":
-        cmd = 'ln -s ./ArmBin {0}'.format(GCC_BIN_PATH)
+        cmd = 'ln -s {0} ./ArmBin '.format(GCC_BIN_PATH)
     else:
         raise RuntimeError('Platform is not support!')
     return_code = os.system(cmd)
