@@ -18,11 +18,13 @@ def dump(file_name):
     return_code = os.system(cmd)
     return True if return_code == 0 else False
 
-def run_gdb(file_name):
-    gdb_cmd = GCC_BIN_PATH + GCC_PREFIX + GDB
-    cmd = '{0} {1}'.format(gdb_cmd, file_name)
-    os.system(cmd)
-    return
+def link_arm_bin():
+    if platform.system() == "Darwin":
+        cmd = 'ln -s ./ArmBin {0}'.format(GCC_BIN_PATH)
+    else:
+        raise RuntimeError('Platform is not support!')
+    return_code = os.system(cmd)
+    return True if return_code == 0 else False
 
 def main():
     parser = argparse.ArgumentParser(description='这是一个示例脚本，演示如何定义自定义指令。')
@@ -31,11 +33,10 @@ def main():
     # parser.add_argument('-ct', type=str, default='', help='仅执行编译，以默认模式编译指定文件')
     # parser.add_argument('-l', action='store_true', help='执行链接，链接失败会直接停止执行')
     # parser.add_argument('-lf', action='store_true', help='执行链接，即便链接失败也会继续执行')
-    # parser.add_argument('-b', action='store_true', help='进行构建并strip')
+    parser.add_argument('-linkArmBin', action='store_true', help='将Arm工具链的bin目录链接到当前工作目录')
     # parser.add_argument('-o', type=str, default='application', help='设置输出文件名称')
     parser.add_argument('-r', type=str, default='', help='readelf文件')
     parser.add_argument('-d', type=str, default='', help='objdump指定文件')
-    parser.add_argument('-gdb', type=str, default='', help='启动gdb并加载指定的elf符号文件')
     # parser.add_argument('-clean', action='store_true', help='清空所有中间文件')
 
     args = parser.parse_args()
@@ -48,10 +49,10 @@ def main():
         dump(args.d)
         return
 
-    if args.gdb != '':
-        run_gdb(args.gdb)
+    if args.linkArmBin:
+        link_arm_bin()
         return
-        
+
 
 if __name__ == '__main__':
     main()
