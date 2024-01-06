@@ -9,10 +9,12 @@ GPP='g++'
 OBJDUMP='objdump'
 OBJCOPY='objcopy'
 READELF='readelf'
+GDB='gdb'
 if platform.system() == "Windows":
     OBJDUMP += '.exe'
     OBJCOPY += '.exe'
     READELF += '.exe'
+    GDB += '.exe'
 
 # 输出环境配置
 INTERMEDIATE_PATH='./intermediate'
