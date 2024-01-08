@@ -33,7 +33,51 @@ int HardFaultHandler() {...}
 3. 链接libstdc++_nano.a需要在链接器里面增加-specs=nosys.specs
 4. 没有异常处理相关的内容以后，二进制文件明显小了非常非常多！
 
-9. 关于使用了static然后异常的问题；
-    * 发现\_\_cxa\_guard\_acquire这个符号的实现有问题，它会跳转到usage fault里面 ！？？
-    * GetInstance的返回本来应该是一个静态对象的引用，但实际上却是返回一个null，导致之后的modifyValue的调用会出发hard fault，因为往null地址里面写入内容
-    * 其次hard fault之后，应用居然还可以返回！！！但是继续执行的结果肯定是异常的！
+##关于使用了static然后异常的问题；
+* 发现\_\_cxa\_guard\_acquire这个符号的实现有问题，它会跳转到usage fault里面 ！？？
+* GetInstance的返回本来应该是一个静态对象的引用，但实际上却是返回一个null，导致之后的modifyValue的调用会出发hard fault，因为往null地址里面写入内容
+* 其次hard fault之后，应用居然还可以返回！！！但是继续执行的结果肯定是异常的！
+  
+* 继续检查局部静态变量的初始化过程。一个局部静态变量通常包含变量本身，以及一个4字节大小的控制块(Control Block)。这些都是编译器帮我规定的。
+* 继续分析__cxa_guard_quire以及__cxa_guard_release，它们在局部静态变量的初始化过程中大概执行以下内容：
+```cpp
+Object obj; // 局部静态变量本身
+uint8_t ControlBlock[4]; // 4字节的控制块
+void obj_init() // 当开始执行 ·static Object obj;· 时候，它实际执行的流程：
+{
+	if (ControlBlock[0] != 0)
+ 		return; // obj已经初始化过了
+    bool guard = __cxa_guard_aquire(ControlBlock[0], ControlBlock[1]);
+    if (guard == false)
+    	return; // 已经有别的线程做过初始化了
+	
+    // obj没有被初始化，对obj调用Object的构造函数
+    __cxa_guard_release(ControlBlock[0]);
+    return;
+}
+
+bool __cxa_guard_aquire(const uint8_t& controlBlock0, uint8_t& controlBlock1)
+{
+	if (controlBlock0 != 0)
+ 		return false; // 已经有别的线程进行过guard_aquire了
+   	if (controlBlock1 == 0) // 第一次调用guard_aquire
+    {
+    	controlBlock1 = 1; // 我已经拿到锁了，之后假如还有别的线程进来，那就是一个未定义的行为了
+     	return true;
+	}
+ 	abort();// crash !!!! 未定义的行为
+}
+
+void __cxa_guard_release(uint8_t& controlBlock0)
+{
+	controlBlock0 = 1;
+ 	return;
+}
+```
+* 目前可以确定的是，通过__cxa_guard_aquire/release，就可以完成对控制块的设置，以确保之后不会再对局部静态变量进行初始化。但是这两个函数是否能够防止多线程冲突，这个是存疑的
+> 不过考虑到目前的平台是stm32f103，也不可能存在什么多线程问题。暂且不进行深究。只要控制块在这些操作下能保证不进行多次初始化即可
+
+* 回到崩溃的问题。事实上，从汇编上看，ControlBloc[0]和[1]只有第0位有效。也就是所有的if判断都只检查第0位。然而，纵观整个程序的汇编，**都没有对控制块进行初始化的代码**！！！控制块的状态完全就是上电是怎样它就是怎样。
+* 所以，我还能观察到，有时候上电，它能正常运行，但大部分时候都会崩溃的原因！！
+
+* 那么，又该如何对控制块进行初始化呢？ChatGPT的回复是：编译器会帮我做。但我的编译器没有帮我呀！！！
