@@ -32,3 +32,8 @@ int HardFaultHandler() {...}
 2. 链接时使用的libstdc++.a文件是一个完整的c++标准库实现！这意味着里面所有的标准库代码都是有异常处理逻辑的！可以使用arm提供的libstdc++_nano.a来代替。但是这个库不仅没有异常处理，还有一些类型相关的功能都没有。
 3. 链接libstdc++_nano.a需要在链接器里面增加-specs=nosys.specs
 4. 没有异常处理相关的内容以后，二进制文件明显小了非常非常多！
+
+9. 关于使用了static然后异常的问题；
+    * 发现\_\_cxa\_guard\_acquire这个符号的实现有问题，它会跳转到usage fault里面 ！？？
+    * GetInstance的返回本来应该是一个静态对象的引用，但实际上却是返回一个null，导致之后的modifyValue的调用会出发hard fault，因为往null地址里面写入内容
+    * 其次hard fault之后，应用居然还可以返回！！！但是继续执行的结果肯定是异常的！
