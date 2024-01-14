@@ -6,6 +6,22 @@ import argparse
 
 from config import *
 
+def create_intermediate_folder():
+    if not os.path.exists(OBJECT_FILE_DIR):
+        os.makedirs(OBJECT_FILE_DIR)
+
+def assembling(file):
+    as_cmd = GCC_BIN_PATH + GCC_PREFIX + AS
+    if not os.path.exists('{0}.S'.format(file)):
+        print('File {0}.S is not exists'.format(file))
+        return False
+    create_intermediate_folder()
+    output_file_path = os.path.join(OBJECT_FILE_DIR, '{0}.o'.format(file))
+
+    cmd = '{0} -o {1} -mcpu=cortex-m3 -mthumb {2}.S'.format(as_cmd, output_file_path, file)
+    return_code = os.system(cmd)
+    print('Assembling file: {0}.S {1}'.format(file, 'Succeed' if return_code == 0 else 'Failed'))
+    return True if return_code == 0 else False
 
 def compilation(file, mode):
     force_thumb_cmd = '-mthumb' if mode == COMPILATION_MODE_FORCE_THUMB else ''
@@ -13,8 +29,7 @@ def compilation(file, mode):
     if not os.path.exists('{0}.cpp'.format(file)):
         print('File {0}.cpp is not exists'.format(file))
         return False
-    if not os.path.exists(OBJECT_FILE_DIR):
-        os.makedirs(OBJECT_FILE_DIR)
+    create_intermediate_folder()
     output_file_path = os.path.join(OBJECT_FILE_DIR, '{0}.o'.format(file))
 
     cmd = '{0} -o {1} -c -g -O0 -std=c++17 -fno-exceptions -mcpu=cortex-m3 {2} {3}.cpp'.format(gpp_cmd, output_file_path, force_thumb_cmd, file)
@@ -87,9 +102,12 @@ def main():
             else:
                 file_name = target_file
                 compile_mode = COMPILATION_MODE_DEFAULT
+            file_ext = file_name.split('.')[1]
             file_name = file_name.split('.')[0]
-
-            is_succeed = compilation(file_name, compile_mode)
+            if file_ext == 'S':
+                is_succeed = assembling(file_name)
+            else:
+                is_succeed = compilation(file_name, compile_mode)
             if is_succeed is False:
                 any_failed = True
                 if go_through is False:
@@ -113,6 +131,8 @@ def main():
             file_name = file_name.split('.')[0]
             file_name = '{0}.o'.format(file_name)
             linke_files.append(file_name)
+        for target_file in FILEs_TO_LINK:
+            linke_files.append(target_file)
         link_output_file_name = '{0}.elf'.format(output_file_name)
         is_succeed = link(linke_files, link_output_file_name)
         if is_succeed is False:

@@ -11,7 +11,7 @@ SECTIONS
         /* Set the initial address to 0 */
         . = 0;
         LONG(__reset_stack_pointer);
-        LONG(main | 1);
+        LONG(__My_Start | 1);
         LONG(NMIHandler | 1);
         LONG(HardFaultHandler | 1);
         LONG(MemoryManagementFaultHandler | 1);
@@ -23,6 +23,7 @@ SECTIONS
         *(.text*);
     } > FLASH /* Put this in the flash memory region */
     .bss : {
+    __bss_start__ = .;
      *(.dynbss)
      *(.bss .bss.* .gnu.linkonce.b.*)
      *(COMMON)
@@ -32,6 +33,7 @@ SECTIONS
         FIXME: Why do we need it? When there is no .bss section, we do not
         pad the .data section.  */
      . = ALIGN(. != 0 ? 32 / 8 : 1);
+     __bss_end__ = .;
     }
     __end__ = .;
     _end = .; PROVIDE (end = .);

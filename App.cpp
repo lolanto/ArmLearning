@@ -11,7 +11,7 @@ public:
         return _inst;
     }
     Object()
-    : mValue(1000)
+    : mValue(50)
     {}
     uint32_t GetValue() { return mValue; }
     uint32_t ModifyValue(uint32_t x) { return mValue += x; }
@@ -29,7 +29,7 @@ int App()
         GPIO::SetGPIOPortValue(GPIO::PORT_GROUP::PG_C, 13, true);
         SysTick::Delay(obj.ModifyValue(1));
         GPIO::SetGPIOPortValue(GPIO::PORT_GROUP::PG_C, 13, false);
-        SysTick::Delay(1000);
+        SysTick::Delay(obj.ModifyValue(1));
     }
 
     return 0;
