@@ -145,7 +145,12 @@ GPIO::OutputDataRegisterSettings& GPIO::getOutputDataRegister()
 GPIO& GPIO::GetInstance(PORT_GROUP group, uint8_t pin)
 {
     static GPIO _insts[PORT_GROUP::PG_COUNT][16] = {};
-    return _insts[group][pin];
+    GPIO& ret = _insts[group][pin];
+    if (ret.mGroup == PORT_GROUP::PG_COUNT)
+    {
+        ret = GPIO(group, pin);
+    }
+    return ret;
 }
 
 void GPIO::SetEnable(bool enable)
@@ -290,16 +295,14 @@ void USART::Enable(uint32_t BaudRate)
     setBaudRateRegister(calculateBaudRateDiv(FClock, BaudRate));
 }
 
-void USART::Send(const uint8_t* data, const uint32_t len)
+void USART::SendSync(const uint8_t* data, const uint32_t len)
 {
-    // TODO: 目前先假设只发送一个字节
-    // 等待数据寄存器处于可写状态
-    while(isDataRegisterReadyToWrite() == false);
-    writeToDataRegister(*data);
-    if (isDataRegisterReadyToWrite() == true)
-        MyLibrary::Trap("Error Here");
-    if (isLastSendingFinised() == true)
-        MyLibrary::Trap("Error There");
+    for(uint32_t i = 0; i < len; ++i)
+    {
+        // 等待数据寄存器处于可写状态
+        while(isDataRegisterReadyToWrite() == false);
+        writeToDataRegister(*(data + i));
+    }
     // 等待最后一次发送也完成了. 是否真的需要这种等待?
     while(isLastSendingFinised() == false);
     return;

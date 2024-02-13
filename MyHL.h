@@ -164,7 +164,7 @@ private:
         using PIN_7_MODE = BitFieldObject<MaskRanger<28, 2>, ControlRegisterLowSettings>;
         using PIN_7_CNF = BitFieldObject<MaskRanger<30, 2>, ControlRegisterLowSettings>;
     };
-    constexpr static uint32_t(*LPinModeSettingFuncs[16])(ControlRegisterLowSettings&, uint32_t) =
+    constexpr static uint32_t(*LPinModeSettingFuncs[8])(ControlRegisterLowSettings&, uint32_t) =
     {
         &ControlRegisterLowSettings::PIN_0_MODE::Set, &ControlRegisterLowSettings::PIN_1_MODE::Set,
         &ControlRegisterLowSettings::PIN_2_MODE::Set, &ControlRegisterLowSettings::PIN_3_MODE::Set,
@@ -190,30 +190,42 @@ private:
     struct OutputDataRegisterSettings
     {
         uint32_t data;
-        using ODR1 = BitFieldObject<MaskRanger<0, 1>, OutputDataRegisterSettings>;
-        using ODR2 = BitFieldObject<MaskRanger<1, 1>, OutputDataRegisterSettings>;
-        using ODR3 = BitFieldObject<MaskRanger<2, 1>, OutputDataRegisterSettings>;
-        using ODR4 = BitFieldObject<MaskRanger<3, 1>, OutputDataRegisterSettings>;
-        using ODR5 = BitFieldObject<MaskRanger<4, 1>, OutputDataRegisterSettings>;
-        using ODR6 = BitFieldObject<MaskRanger<5, 1>, OutputDataRegisterSettings>;
-        using ODR7 = BitFieldObject<MaskRanger<6, 1>, OutputDataRegisterSettings>;
-        using ODR8 = BitFieldObject<MaskRanger<7, 1>, OutputDataRegisterSettings>;
-        using ODR9 = BitFieldObject<MaskRanger<8, 1>, OutputDataRegisterSettings>;
-        using ODR10 = BitFieldObject<MaskRanger<9, 1>, OutputDataRegisterSettings>;
-        using ODR11 = BitFieldObject<MaskRanger<10, 1>, OutputDataRegisterSettings>;
-        using ODR12 = BitFieldObject<MaskRanger<11, 1>, OutputDataRegisterSettings>;
-        using ODR13 = BitFieldObject<MaskRanger<12, 1>, OutputDataRegisterSettings>;
-        using ODR14 = BitFieldObject<MaskRanger<13, 1>, OutputDataRegisterSettings>;
-        using ODR15 = BitFieldObject<MaskRanger<14, 1>, OutputDataRegisterSettings>;
+        using ODR0 = BitFieldObject<MaskRanger<0, 1>, OutputDataRegisterSettings>;
+        using ODR1 = BitFieldObject<MaskRanger<1, 1>, OutputDataRegisterSettings>;
+        using ODR2 = BitFieldObject<MaskRanger<2, 1>, OutputDataRegisterSettings>;
+        using ODR3 = BitFieldObject<MaskRanger<3, 1>, OutputDataRegisterSettings>;
+        using ODR4 = BitFieldObject<MaskRanger<4, 1>, OutputDataRegisterSettings>;
+        using ODR5 = BitFieldObject<MaskRanger<5, 1>, OutputDataRegisterSettings>;
+        using ODR6 = BitFieldObject<MaskRanger<6, 1>, OutputDataRegisterSettings>;
+        using ODR7 = BitFieldObject<MaskRanger<7, 1>, OutputDataRegisterSettings>;
+        using ODR8 = BitFieldObject<MaskRanger<8, 1>, OutputDataRegisterSettings>;
+        using ODR9 = BitFieldObject<MaskRanger<9, 1>, OutputDataRegisterSettings>;
+        using ODR10 = BitFieldObject<MaskRanger<10, 1>, OutputDataRegisterSettings>;
+        using ODR11 = BitFieldObject<MaskRanger<11, 1>, OutputDataRegisterSettings>;
+        using ODR12 = BitFieldObject<MaskRanger<12, 1>, OutputDataRegisterSettings>;
+        using ODR13 = BitFieldObject<MaskRanger<13, 1>, OutputDataRegisterSettings>;
+        using ODR14 = BitFieldObject<MaskRanger<14, 1>, OutputDataRegisterSettings>;
+        using ODR15 = BitFieldObject<MaskRanger<15, 1>, OutputDataRegisterSettings>;
     };
-    constexpr static uint32_t(*PinOutputDataRegisterSettingsFuncs[15])(OutputDataRegisterSettings&, uint32_t) =
+    constexpr static uint32_t(*PinOutputDataRegisterSettingsFuncs[16])(OutputDataRegisterSettings&, uint32_t) =
     {
-        &OutputDataRegisterSettings::ODR1::Set, &OutputDataRegisterSettings::ODR2::Set, &OutputDataRegisterSettings::ODR3::Set, &OutputDataRegisterSettings::ODR4::Set, &OutputDataRegisterSettings::ODR5::Set, &OutputDataRegisterSettings::ODR6::Set, &OutputDataRegisterSettings::ODR7::Set, &OutputDataRegisterSettings::ODR8::Set, 
-        &OutputDataRegisterSettings::ODR9::Set, &OutputDataRegisterSettings::ODR10::Set, &OutputDataRegisterSettings::ODR11::Set, &OutputDataRegisterSettings::ODR12::Set, &OutputDataRegisterSettings::ODR13::Set, &OutputDataRegisterSettings::ODR14::Set, &OutputDataRegisterSettings::ODR15::Set, 
+        &OutputDataRegisterSettings::ODR0::Set,&OutputDataRegisterSettings::ODR1::Set,
+        &OutputDataRegisterSettings::ODR2::Set,&OutputDataRegisterSettings::ODR3::Set,
+        &OutputDataRegisterSettings::ODR4::Set,&OutputDataRegisterSettings::ODR5::Set,
+        &OutputDataRegisterSettings::ODR6::Set,&OutputDataRegisterSettings::ODR7::Set,
+        &OutputDataRegisterSettings::ODR8::Set, &OutputDataRegisterSettings::ODR9::Set,
+        &OutputDataRegisterSettings::ODR10::Set,&OutputDataRegisterSettings::ODR11::Set,
+        &OutputDataRegisterSettings::ODR12::Set,&OutputDataRegisterSettings::ODR13::Set,
+        &OutputDataRegisterSettings::ODR14::Set,&OutputDataRegisterSettings::ODR15::Set, 
     };
     static_assert(sizeof(OutputDataRegisterSettings) == sizeof(uint32_t));
 private:
-    GPIO() = default;
+    GPIO()
+     : mGroup(PORT_GROUP::PG_COUNT) {};
+    GPIO(PORT_GROUP group, uint8_t pin)
+     : mGroup(group), mPin(pin)
+     , mValue(false), mMode(PORT_MODE::PM_INPUT)
+     , mUsage(PORT_USAGE::PU_INPUT_FLOATING) {};
     uint32_t getControlRegisterAddr();
     uint32_t getGroupRegisterAddr();
     OutputDataRegisterSettings& getOutputDataRegister();
@@ -362,7 +374,7 @@ private:
     static_assert(sizeof(DataRegisterSettings) == sizeof(uint32_t));
 public:
     void Enable(uint32_t baudRate);
-    void Send(const uint8_t* data, const uint32_t len);
+    void SendSync(const uint8_t* data, const uint32_t len);
 private:
     template<typename CRSettings>
     CRSettings getControlRegister()
