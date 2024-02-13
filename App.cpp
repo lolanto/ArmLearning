@@ -2,34 +2,22 @@
 #include <cstdint>
 #include "MyHL.h"
 
-class Object
-{
-public:
-    static Object& GetInstance()
-    {
-        static Object _inst;
-        return _inst;
-    }
-    Object()
-    : mValue(50)
-    {}
-    uint32_t GetValue() { return mValue; }
-    uint32_t ModifyValue(uint32_t x) { return mValue += x; }
-private:
-    uint32_t mValue;
-};
 
 int App()
 {
-    RCC::Set_RCC_GPIOGroup(GPIO::PORT_GROUP::PG_C, true);
-    GPIO::SetGPIOPortMode(GPIO::PORT_GROUP::PG_C, 13, GPIO::PORT_MODE::PM_OUTPUT_10MHz);
-    auto& obj = Object::GetInstance();
+    GPIO& gpioPC13 = GPIO::GetInstance(GPIO::PORT_GROUP::PG_C, 13);
+    gpioPC13.SetEnable(true);
+    gpioPC13.SetPortMode(GPIO::PORT_MODE::PM_OUTPUT_2MHz, GPIO::PORT_USAGE::PU_OUTPUT_PUSH_PULL);
+    USART& usart3 = USART::GetInstance(USART::PORT::U3);
+    usart3.Enable(115200);
+    char c = 'b';
     while(1)
     {
-        GPIO::SetGPIOPortValue(GPIO::PORT_GROUP::PG_C, 13, true);
-        SysTick::Delay(obj.ModifyValue(1));
-        GPIO::SetGPIOPortValue(GPIO::PORT_GROUP::PG_C, 13, false);
-        SysTick::Delay(obj.ModifyValue(1));
+        gpioPC13.SetPortOutputValue(true);
+        SysTick::Delay(1000);
+        gpioPC13.SetPortOutputValue(false);
+        SysTick::Delay(1000);
+        usart3.Send((uint8_t*)(&c), 1);
     }
 
     return 0;

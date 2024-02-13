@@ -6,10 +6,12 @@ int App();
 
 int main()
 {
-    RCC::InitClock();
-    RCC::Set_RCC_GPIOGroup(GPIO::PORT_GROUP::PG_A, true);
-    GPIO::SetGPIOPortMode(GPIO::PORT_GROUP::PG_A, 1, GPIO::PORT_MODE::PM_OUTPUT_2MHz);
-    GPIO::SetGPIOPortValue(GPIO::PORT_GROUP::PG_A, 1, true);
+    RCC& rcc = RCC::GetInstance();
+    rcc.InitClock();
+    GPIO& gpioPA1 = GPIO::GetInstance(GPIO::PORT_GROUP::PG_A, 1);
+    gpioPA1.SetEnable(true);
+    gpioPA1.SetPortMode(GPIO::PORT_MODE::PM_OUTPUT_2MHz, GPIO::PORT_USAGE::PU_OUTPUT_PUSH_PULL);
+    gpioPA1.SetPortOutputValue(true);
     App();
     return 0;
 }
@@ -26,10 +28,11 @@ int NMIHandler()
 extern "C" int HardFaultHandler();
 int HardFaultHandler()
 {
-    RCC::DisableAll_RCC_GPIO();
-    RCC::Set_RCC_GPIOGroup(GPIO::PORT_GROUP::PG_A, true);
-    GPIO::SetGPIOPortMode(GPIO::PORT_GROUP::PG_A, 0, GPIO::PORT_MODE::PM_OUTPUT_2MHz);
-    GPIO::SetGPIOPortValue(GPIO::PORT_GROUP::PG_A, 0, true);
+    RCC::GetInstance().DisableAllGPIO();
+    GPIO& gpioPA0 = GPIO::GetInstance(GPIO::PORT_GROUP::PG_A, 0);
+    gpioPA0.SetEnable(true);
+    gpioPA0.SetPortMode(GPIO::PORT_MODE::PM_OUTPUT_2MHz, GPIO::PORT_USAGE::PU_OUTPUT_PUSH_PULL);
+    gpioPA0.SetPortOutputValue(true);
     return 0;
 }
 
@@ -48,9 +51,10 @@ int BusFaultHandler()
 extern "C" int UsageFaultHandler();
 int UsageFaultHandler()
 {
-    RCC::DisableAll_RCC_GPIO();
-    RCC::Set_RCC_GPIOGroup(GPIO::PORT_GROUP::PG_A, true);
-    GPIO::SetGPIOPortMode(GPIO::PORT_GROUP::PG_A, 2, GPIO::PORT_MODE::PM_OUTPUT_2MHz);
-    GPIO::SetGPIOPortValue(GPIO::PORT_GROUP::PG_A, 2, true);
+    RCC::GetInstance().DisableAllGPIO();
+    GPIO& gpioPA2 = GPIO::GetInstance(GPIO::PORT_GROUP::PG_A, 2);
+    gpioPA2.SetEnable(true);
+    gpioPA2.SetPortMode(GPIO::PORT_MODE::PM_OUTPUT_2MHz, GPIO::PORT_USAGE::PU_OUTPUT_PUSH_PULL);
+    gpioPA2.SetPortOutputValue(true);
     return 0;
 }
