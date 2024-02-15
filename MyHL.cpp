@@ -14,9 +14,6 @@ void RCC::InitClock()
 {
     ControlRegisterSettings& CR = (*(reinterpret_cast<ControlRegisterSettings*>(RCC_CR_ADDR)));
     ConfigureRegisterSettings& CFRG = (*(reinterpret_cast<ConfigureRegisterSettings*>(RCC_CFGR_ADDR)));
-    APB1PeripheralClockEnableRegisterSettings& APB1Enr = (*(reinterpret_cast<APB1PeripheralClockEnableRegisterSettings*>(RCC_APB1ENR_REGISTER_ADDR)));
-    // 使能USART3外设时钟 TODO: 应该开放成接口让外面调用?
-    APB1PeripheralClockEnableRegisterSettings::USART3EN::Set(APB1Enr, 1);
     // 启动外部高速时钟，注意：当前硬件外接的时钟周期是8MHz!!!8MHz!!!8MHz!!!8MHz!!!
     ControlRegisterSettings::HSEON::Set(CR, true);
     // 检查外部时钟是否就绪
@@ -117,6 +114,12 @@ void RCC::EnableUSART(USART::PORT port, bool enable)
         else
             std::abort();
     }
+}
+
+void RCC::EnableDMA(bool enable)
+{
+    AHBPeripheralClockEnableRegisterSettings& ahbenr = (*(reinterpret_cast<AHBPeripheralClockEnableRegisterSettings*>(RCC_AHBENR_REGISTER_ADDR)));
+    AHBPeripheralClockEnableRegisterSettings::DMAEN::Set(ahbenr, enable ? 1 : 0);
 }
 
 constexpr uint32_t GPIO::PORT_GROUP_BASE_ADDRs[5];
@@ -283,14 +286,14 @@ void USART::Enable(uint32_t BaudRate)
     }
     // 是否需要对USART串口复位?
     RCC::GetInstance().ResetUSART(mCurrentUsingPort, false);
-    CR1BitSettings cr1 = getControlRegister<CR1BitSettings>();
-    CR2BitSettings cr2 = getControlRegister<CR2BitSettings>();
+    CR1BitSettings& cr1 = getControlRegister<CR1BitSettings>();
+    CR2BitSettings& cr2 = getControlRegister<CR2BitSettings>();
     CR1BitSettings::UE::Set(cr1, 1); // enable usart
     CR1BitSettings::M::Set(cr1, 0); // 8 bit per word
     CR2BitSettings::STOP::Set(cr2, 0); // 1 bit for stop
     CR1BitSettings::TE::Set(cr1, 1); // enable transmit
-    setControlRegister(cr1);
-    setControlRegister(cr2);
+    CR1BitSettings::TCIE::Set(cr1, 1);
+    CR1BitSettings::TXEIE::Set(cr1, 1);
     const uint32_t FClock = (mCurrentUsingPort == USART::PORT::U1 ? 72000000u : 36000000u); // 假设时钟频率是一个常数，另外，因为USART1是在APB1上，可以全速运行，而2，3是在APB2上，最高不超过36MHz
     setBaudRateRegister(calculateBaudRateDiv(FClock, BaudRate));
 }
@@ -306,6 +309,14 @@ void USART::SendSync(const uint8_t* data, const uint32_t len)
     // 等待最后一次发送也完成了. 是否真的需要这种等待?
     while(isLastSendingFinised() == false);
     return;
+}
+
+void USART::SendAsync(const uint8_t* data, const uint32_t len, void(*callback)())
+{
+    CR1BitSettings& cr1 = getControlRegister<CR1BitSettings>();
+    CR1BitSettings::TCIE::Set(cr1, true);
+    while(isDataRegisterReadyToWrite() == false);
+    writeToDataRegister((*data));
 }
 
 USART::BaudRateDivSettings USART::calculateBaudRateDiv(uint32_t fClock, uint32_t desiredBaudRate)
@@ -337,4 +348,111 @@ bool USART::isLastSendingFinised() const
 {
     const SRSettings& srs = *(reinterpret_cast<SRSettings*>(GetStateRegisterAddr(mCurrentUsingPort)));
     return SRSettings::TC::Get(srs) != 0;
+}
+
+bool DMA::CheckInterruptFlag(DMA::INTERRUPT_TYPE type)
+{
+    DMAInterruptStateRegisterSettings& isr = DMA::getInterruptStateRegister();
+    switch (type)
+    {
+    case DMA::INTERRUPT_TYPE::IT_GLOBAL_INTERRUPT:
+        return GetDMAInterruptStateOfGIF[mChannel](isr) != 0;
+    case DMA::INTERRUPT_TYPE::IT_HALF_TRANSMISSION_COMPLETED_INTERRUPT:
+        return GetDMAInterruptStateOfHTIF[mChannel](isr) != 0;
+    case DMA::INTERRUPT_TYPE::IT_TRANSMISSION_COMPLETED_INTERRUPT:
+        return GetDMAInterruptStateOfTCIF[mChannel](isr) != 0;
+    case DMA::INTERRUPT_TYPE::IT_TRANSMISSION_ERROR_INTERRUPT:
+        return GetDMAInterruptStateOfTEIF[mChannel](isr) != 0;
+    default:
+        std::abort();
+    }
+    return false;
+}
+
+void DMA::SetInterruptFlag(DMA::INTERRUPT_TYPE type, bool flag)
+{
+    DMAInterruptStateClearRegisterSettings& iscr = DMA::getInterruptStateClearRegister();
+    switch(type)
+    {
+    case DMA::INTERRUPT_TYPE::IT_GLOBAL_INTERRUPT:
+        SetDMAInterruptStateOfGIF[mChannel](iscr, flag);
+        break;
+    case DMA::INTERRUPT_TYPE::IT_HALF_TRANSMISSION_COMPLETED_INTERRUPT:
+        SetDMAInterruptStateOfHTIF[mChannel](iscr, flag);
+        break;
+    case DMA::INTERRUPT_TYPE::IT_TRANSMISSION_COMPLETED_INTERRUPT:
+        SetDMAInterruptStateOfTCIF[mChannel](iscr, flag);
+        break;
+    case DMA::INTERRUPT_TYPE::IT_TRANSMISSION_ERROR_INTERRUPT:
+        SetDMAInterruptStateOfTEIF[mChannel](iscr, flag);
+        break;
+    default:
+        std::abort();
+    }
+    return;
+}
+
+void DMA::Disable()
+{
+    ChannelConfigureRegisterSettings& ccr = getChannelConfigureRegister();
+    ChannelConfigureRegisterSettings::EN::Set(ccr, false);
+}
+
+void DMA::SendData(MODE mode, uint32_t len
+    , uint32_t addressOfSource, BitWidth bitWidthOfSource
+    , uint32_t addressOfDest, BitWidth bitWidthOfDest
+    , uint8_t interruptMode)
+{
+    len = len >= 65535 ? 65535 : len;
+    if (len <= 0)
+        return;
+    RCC::GetInstance().EnableDMA(true);
+    ChannelConfigureRegisterSettings& ccr = getChannelConfigureRegister();
+    ChannelMemoryAddressRegisterSettings& cmar = getChannelMemoryAddressRegister();
+    ChannelPeripheralAddressRegisterSettings& cpar = getChannelPeripheralAddressRegister();
+    ChannelNumberOfDataRegisterSettings& cndr = getChannelNumberOfDataRegister();
+    mMode = mode;
+    mBitWidthOfSource = bitWidthOfSource;
+    mBitWidthOfDest = bitWidthOfDest;
+    mDestAddress = addressOfDest;
+    mSourceAddress = addressOfSource;
+    ChannelNumberOfDataRegisterSettings::NDT::Set(cndr, len);
+    if (mMode == DMA::MODE::FROM_MEMORY_TO_MEMORY)
+    {
+        // 事实上我已经有点看不懂这个设置的意义了
+        if (mBitWidthOfDest != mBitWidthOfSource)
+            std::abort();
+        ChannelConfigureRegisterSettings::MEM2MEM::Set(ccr, 1);
+        ChannelConfigureRegisterSettings::DIR::Set(ccr, 0);
+        ChannelConfigureRegisterSettings::MSIZE::Set(ccr, (mBitWidthOfDest == BW_8bit ? 0 : (mBitWidthOfDest == BW_16bit ? 1 : 2)));
+        ChannelMemoryAddressRegisterSettings::MA::Set(cmar, mSourceAddress);
+        ChannelPeripheralAddressRegisterSettings::PA::Set(cpar, mDestAddress);
+    }
+    else if (mMode == DMA::MODE::FROM_PERIPHERAL_TO_MEMORY)
+    {
+        ChannelConfigureRegisterSettings::MEM2MEM::Set(ccr, 0);
+        ChannelConfigureRegisterSettings::DIR::Set(ccr, 1);
+        ChannelConfigureRegisterSettings::MSIZE::Set(ccr, (mBitWidthOfDest == BW_8bit ? 0 : (mBitWidthOfDest == BW_16bit ? 1 : 2)));
+        ChannelConfigureRegisterSettings::PSIZE::Set(ccr, (mBitWidthOfSource == BW_8bit ? 0 : (mBitWidthOfSource == BW_16bit ? 1 : 2)));
+        ChannelMemoryAddressRegisterSettings::MA::Set(cmar, mDestAddress);
+        ChannelPeripheralAddressRegisterSettings::PA::Set(cpar, mSourceAddress);
+    }
+    else
+        std::abort();
+    // TODO: 暂时默认全部都可以自增，同时默认了不使用循环，优先级还是默认的低优先级
+    ChannelConfigureRegisterSettings::MINC::Set(ccr, 1);
+    ChannelConfigureRegisterSettings::PINC::Set(ccr, 1);
+    ChannelConfigureRegisterSettings::TCIE::Set(ccr, interruptMode & INTERRUPT_TYPE::IT_TRANSMISSION_COMPLETED_INTERRUPT);
+    ChannelConfigureRegisterSettings::TEIE::Set(ccr, interruptMode & INTERRUPT_TYPE::IT_TRANSMISSION_ERROR_INTERRUPT);
+    ChannelConfigureRegisterSettings::HTIE::Set(ccr, interruptMode & INTERRUPT_TYPE::IT_HALF_TRANSMISSION_COMPLETED_INTERRUPT);
+    ChannelConfigureRegisterSettings::EN::Set(ccr, true);
+}
+
+DMA& DMA::GetInstance(DMA::CHANNEL channel)
+{
+    static DMA _insts[DMA::CHANNEL::COUNT];
+    DMA& ret = _insts[channel];
+    if (ret.mChannel == DMA::CHANNEL::COUNT)
+        ret = DMA(channel);
+    return ret;
 }

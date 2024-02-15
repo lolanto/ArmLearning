@@ -17,6 +17,10 @@ SECTIONS
         LONG(MemoryManagementFaultHandler | 1);
         LONG(BusFaultHandler | 1);
         LONG(UsageFaultHandler | 1);
+        . = 0xD4;
+        LONG(USART1InterruptHandler | 1);
+        LONG(USART2InterruptHandler | 1);
+        LONG(USART3InterruptHandler | 1);
         /* The whole interrupt table is 332 bytes long. Advance to that position. */
         . = 332;
         /* And here comes the rest of the code */

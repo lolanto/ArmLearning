@@ -27,7 +27,7 @@ COMPILATION_MODE_FORCE_THUMB = 1
 
 # 编译使用的文件配置
 LINK_SCRIPT='./memory.ld' # 配置链接脚本
-COMPILE_FILES=[('main.cpp', COMPILATION_MODE_FORCE_THUMB), 'App.cpp', 'MyHL.cpp', 'Start.S']
+COMPILE_FILES=[('main.cpp', COMPILATION_MODE_FORCE_THUMB), 'App.cpp', 'MyHL.cpp', 'MyLibrary.cpp', 'Start.S']
 FILEs_TO_LINK=[]
 
 # 烧写相关的配置

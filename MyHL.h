@@ -19,7 +19,7 @@ struct MaskRanger
 {
     static_assert(_beg + _len <= 32 && _len > 0 && _beg >= 0 && _beg < 31);
     constexpr static uint32_t RANGE_MASK = BIT_RANGE_MASK(_beg, _beg + _len);
-    constexpr static uint32_t VALID_MASK = (1u << (_len)) - 1;
+    constexpr static uint32_t VALID_MASK = _len >= 32 ? 0xFFFFFFFF :((1u << (_len)) - 1);
     constexpr static uint32_t BEG = _beg;
 };
 
@@ -372,22 +372,21 @@ private:
         using DR = BitFieldObject<MaskRanger<0, 9>, DataRegisterSettings>;
     };
     static_assert(sizeof(DataRegisterSettings) == sizeof(uint32_t));
+    struct USARTAsyncHelper
+    {
+
+    };
 public:
     void Enable(uint32_t baudRate);
     void SendSync(const uint8_t* data, const uint32_t len);
+    void SendAsync(const uint8_t* data, const uint32_t len, void(*callback)() = nullptr);
 private:
     template<typename CRSettings>
-    CRSettings getControlRegister()
+    CRSettings& getControlRegister()
     {
         uint32_t registerAddr = USART_CR_BASE_ADDR_OFFSETs[CRSettings::CR_INDEX] + USARTx_BASE_ADDRs[mCurrentUsingPort];
-        CRSettings settings = (*reinterpret_cast<CRSettings*>(registerAddr));
+        CRSettings& settings = (*reinterpret_cast<CRSettings*>(registerAddr));
         return settings;
-    }
-    template<typename CRSettings>
-    void setControlRegister(CRSettings settings)
-    {
-        uint32_t registerAddr = USART_CR_BASE_ADDR_OFFSETs[CRSettings::CR_INDEX] + USARTx_BASE_ADDRs[mCurrentUsingPort];
-        (*reinterpret_cast<CRSettings*>(registerAddr)) = settings;
     }
     void setBaudRateRegister(BaudRateDivSettings settings);
     /**
@@ -410,6 +409,223 @@ private:
     const PORT mCurrentUsingPort;
 };
 
+class DMA
+{
+public:
+    enum CHANNEL : uint8_t
+    {
+        C1 = 0,
+        C2 = 1,
+        C3,
+        C4,
+        C5,
+        C6,
+        C7,
+        COUNT
+    };
+    enum INTERRUPT_TYPE : uint8_t
+    {
+        IT_TRANSMISSION_COMPLETED_INTERRUPT = 0b00000001,
+        IT_HALF_TRANSMISSION_COMPLETED_INTERRUPT = 0b00000010,
+        IT_TRANSMISSION_ERROR_INTERRUPT = 0b00000100,
+        IT_GLOBAL_INTERRUPT = IT_TRANSMISSION_COMPLETED_INTERRUPT | IT_HALF_TRANSMISSION_COMPLETED_INTERRUPT | IT_TRANSMISSION_ERROR_INTERRUPT,
+    };
+    enum MODE : uint8_t
+    {
+        FROM_PERIPHERAL_TO_MEMORY,
+        FROM_MEMORY_TO_MEMORY
+        // TODO: 为什么没有从存储器到外设呢?
+    };
+    enum BitWidth : uint8_t
+    {
+        BW_8bit,
+        BW_16bit,
+        BW_32bit
+    };
+    static constexpr uint32_t DMA_BASE_ADDR = 0x40020000u;
+    static constexpr uint32_t DMA_ISR_ADDR = DMA_BASE_ADDR + 0x0u; // interrupt state
+    static constexpr uint32_t DMA_IFCR_ADDR = DMA_BASE_ADDR + 0x4u; // interrupt flag clear
+    #define GET_DMA_CCR_ADDR_OF_CHANNEL(c) (DMA_BASE_ADDR + 0x8u + uint32_t(c) * 20u)
+    static constexpr uint32_t DMA_CCR_ADDRs[CHANNEL::COUNT] =
+    {
+        GET_DMA_CCR_ADDR_OF_CHANNEL(C1), GET_DMA_CCR_ADDR_OF_CHANNEL(C2), GET_DMA_CCR_ADDR_OF_CHANNEL(C3), GET_DMA_CCR_ADDR_OF_CHANNEL(C4), 
+        GET_DMA_CCR_ADDR_OF_CHANNEL(C5), GET_DMA_CCR_ADDR_OF_CHANNEL(C6), GET_DMA_CCR_ADDR_OF_CHANNEL(C7)
+    };
+    #define GET_DMA_CNDTR_ADDR_OF_CHANNEL(c) (DMA_BASE_ADDR + 0xcu + uint32_t(c) * 20u)
+    static constexpr uint32_t DMA_CNDTR_ADDRs[CHANNEL::COUNT] =
+    {
+        GET_DMA_CNDTR_ADDR_OF_CHANNEL(C1), GET_DMA_CNDTR_ADDR_OF_CHANNEL(C2), GET_DMA_CNDTR_ADDR_OF_CHANNEL(C3), GET_DMA_CNDTR_ADDR_OF_CHANNEL(C4),
+        GET_DMA_CNDTR_ADDR_OF_CHANNEL(C5), GET_DMA_CNDTR_ADDR_OF_CHANNEL(C6), GET_DMA_CNDTR_ADDR_OF_CHANNEL(C7),
+    };
+    #define GET_DMA_CPAR_ADDR_OF_CHANNEL(c) (DMA_BASE_ADDR + 0x10u + uint32_t(c) * 20u)
+    static constexpr uint32_t DMA_CPAR_ADDRs[CHANNEL::COUNT] =
+    {
+        GET_DMA_CPAR_ADDR_OF_CHANNEL(C1), GET_DMA_CPAR_ADDR_OF_CHANNEL(C2), GET_DMA_CPAR_ADDR_OF_CHANNEL(C3), GET_DMA_CPAR_ADDR_OF_CHANNEL(C4),
+        GET_DMA_CPAR_ADDR_OF_CHANNEL(C5), GET_DMA_CPAR_ADDR_OF_CHANNEL(C6), GET_DMA_CPAR_ADDR_OF_CHANNEL(C7),
+    };
+    #define GET_DMA_CMAR_ADDR_OF_CHANNEL(c) (DMA_BASE_ADDR + 0x14u + uint32_t(c) * 20u)
+    static constexpr uint32_t DMA_CMAR_ADDRs[CHANNEL::COUNT] =
+    {
+        GET_DMA_CMAR_ADDR_OF_CHANNEL(C1), GET_DMA_CMAR_ADDR_OF_CHANNEL(C2), GET_DMA_CMAR_ADDR_OF_CHANNEL(C3), GET_DMA_CMAR_ADDR_OF_CHANNEL(C4),
+        GET_DMA_CMAR_ADDR_OF_CHANNEL(C5), GET_DMA_CMAR_ADDR_OF_CHANNEL(C6), GET_DMA_CMAR_ADDR_OF_CHANNEL(C7),
+    };
+    bool CheckInterruptFlag(INTERRUPT_TYPE type);
+    void SetInterruptFlag(INTERRUPT_TYPE type, bool value);
+    void Disable();
+    void SendData(MODE mode, uint32_t len
+        , uint32_t addressOfSource, BitWidth bitWidthOfSource
+        , uint32_t addressOfDest, BitWidth bitWidthOfDest
+        , uint8_t interruptMode);
+    DMA& GetInstance(CHANNEL channel);
+private:
+    struct DMAInterruptStateRegisterSettings // <<< read only!!!!
+    {
+        uint32_t data;
+        using GIF1 = BitFieldObject<MaskRanger<0 + 4 * C1, 1>, DMAInterruptStateRegisterSettings>; // Global Interrupt Flag，通道触发了任意一个中断
+        using TCIF1 = BitFieldObject<MaskRanger<1 + 4 * C1, 1>, DMAInterruptStateRegisterSettings>; // Transmission Completed Interrupt Flag，通道传输完成而设置的中断
+        using HTIF1 = BitFieldObject<MaskRanger<2 + 4 * C1, 1>, DMAInterruptStateRegisterSettings>; // HALF Transmission Completed Interrupt Flag, 通道数据传输过半而设置的中断
+        using TEIF1 = BitFieldObject<MaskRanger<3 + 4 * C1, 1>, DMAInterruptStateRegisterSettings>; // Transmission Error Interrupt Flag, 通道传输过程中出错的中断
+
+        using GIF2 = BitFieldObject<MaskRanger<0 + 4 * C2, 1>, DMAInterruptStateRegisterSettings>; 
+        using TCIF2 = BitFieldObject<MaskRanger<1 + 4 * C2, 1>, DMAInterruptStateRegisterSettings>;
+        using HTIF2 = BitFieldObject<MaskRanger<2 + 4 * C2, 1>, DMAInterruptStateRegisterSettings>;
+        using TEIF2 = BitFieldObject<MaskRanger<3 + 4 * C2, 1>, DMAInterruptStateRegisterSettings>;
+
+        using GIF3 = BitFieldObject<MaskRanger<0 + 4 * C3, 1>, DMAInterruptStateRegisterSettings>; 
+        using TCIF3 = BitFieldObject<MaskRanger<1 + 4 * C3, 1>, DMAInterruptStateRegisterSettings>; 
+        using HTIF3 = BitFieldObject<MaskRanger<2 + 4 * C3, 1>, DMAInterruptStateRegisterSettings>; 
+        using TEIF3 = BitFieldObject<MaskRanger<3 + 4 * C3, 1>, DMAInterruptStateRegisterSettings>; 
+
+        using GIF4 = BitFieldObject<MaskRanger<0 + 4 * C4, 1>, DMAInterruptStateRegisterSettings>; 
+        using TCIF4 = BitFieldObject<MaskRanger<1 + 4 * C4, 1>, DMAInterruptStateRegisterSettings>; 
+        using HTIF4 = BitFieldObject<MaskRanger<2 + 4 * C4, 1>, DMAInterruptStateRegisterSettings>; 
+        using TEIF4 = BitFieldObject<MaskRanger<3 + 4 * C4, 1>, DMAInterruptStateRegisterSettings>; 
+
+        using GIF5 = BitFieldObject<MaskRanger<0 + 4 * C5, 1>, DMAInterruptStateRegisterSettings>; 
+        using TCIF5 = BitFieldObject<MaskRanger<1 + 4 * C5, 1>, DMAInterruptStateRegisterSettings>; 
+        using HTIF5 = BitFieldObject<MaskRanger<2 + 4 * C5, 1>, DMAInterruptStateRegisterSettings>; 
+        using TEIF5 = BitFieldObject<MaskRanger<3 + 4 * C5, 1>, DMAInterruptStateRegisterSettings>; 
+
+        using GIF6 = BitFieldObject<MaskRanger<0 + 4 * C6, 1>, DMAInterruptStateRegisterSettings>; 
+        using TCIF6 = BitFieldObject<MaskRanger<1 + 4 * C6, 1>, DMAInterruptStateRegisterSettings>; 
+        using HTIF6 = BitFieldObject<MaskRanger<2 + 4 * C6, 1>, DMAInterruptStateRegisterSettings>; 
+        using TEIF6 = BitFieldObject<MaskRanger<3 + 4 * C6, 1>, DMAInterruptStateRegisterSettings>; 
+
+        using GIF7 = BitFieldObject<MaskRanger<0 + 4 * C7, 1>, DMAInterruptStateRegisterSettings>; 
+        using TCIF7 = BitFieldObject<MaskRanger<1 + 4 * C7, 1>, DMAInterruptStateRegisterSettings>; 
+        using HTIF7 = BitFieldObject<MaskRanger<2 + 4 * C7, 1>, DMAInterruptStateRegisterSettings>; 
+        using TEIF7 = BitFieldObject<MaskRanger<3 + 4 * C7, 1>, DMAInterruptStateRegisterSettings>; 
+    };
+    constexpr static uint32_t(*GetDMAInterruptStateOfGIF[CHANNEL::COUNT])(const DMAInterruptStateRegisterSettings&) =
+    {
+        &DMAInterruptStateRegisterSettings::GIF1::Get, &DMAInterruptStateRegisterSettings::GIF2::Get, &DMAInterruptStateRegisterSettings::GIF3::Get,
+        &DMAInterruptStateRegisterSettings::GIF4::Get, &DMAInterruptStateRegisterSettings::GIF5::Get, &DMAInterruptStateRegisterSettings::GIF6::Get,
+        &DMAInterruptStateRegisterSettings::GIF7::Get
+    };
+    constexpr static uint32_t(*GetDMAInterruptStateOfTCIF[CHANNEL::COUNT])(const DMAInterruptStateRegisterSettings&) =
+    {
+        &DMAInterruptStateRegisterSettings::TCIF1::Get, &DMAInterruptStateRegisterSettings::TCIF2::Get, &DMAInterruptStateRegisterSettings::TCIF3::Get,
+        &DMAInterruptStateRegisterSettings::TCIF4::Get, &DMAInterruptStateRegisterSettings::TCIF5::Get, &DMAInterruptStateRegisterSettings::TCIF6::Get,
+        &DMAInterruptStateRegisterSettings::TCIF7::Get
+    };
+    constexpr static uint32_t(*GetDMAInterruptStateOfHTIF[CHANNEL::COUNT])(const DMAInterruptStateRegisterSettings&) =
+    {
+        &DMAInterruptStateRegisterSettings::HTIF1::Get, &DMAInterruptStateRegisterSettings::HTIF2::Get, &DMAInterruptStateRegisterSettings::HTIF3::Get,
+        &DMAInterruptStateRegisterSettings::HTIF4::Get, &DMAInterruptStateRegisterSettings::HTIF5::Get, &DMAInterruptStateRegisterSettings::HTIF6::Get,
+        &DMAInterruptStateRegisterSettings::HTIF7::Get
+    };
+    constexpr static uint32_t(*GetDMAInterruptStateOfTEIF[CHANNEL::COUNT])(const DMAInterruptStateRegisterSettings&) =
+    {
+        &DMAInterruptStateRegisterSettings::TEIF1::Get, &DMAInterruptStateRegisterSettings::TEIF2::Get, &DMAInterruptStateRegisterSettings::TEIF3::Get,
+        &DMAInterruptStateRegisterSettings::TEIF4::Get, &DMAInterruptStateRegisterSettings::TEIF5::Get, &DMAInterruptStateRegisterSettings::TEIF6::Get,
+        &DMAInterruptStateRegisterSettings::TEIF7::Get
+    };
+    static_assert(sizeof(DMAInterruptStateRegisterSettings) == sizeof(uint32_t));
+
+    using DMAInterruptStateClearRegisterSettings = DMAInterruptStateRegisterSettings; // Can read and write!!!
+    constexpr static uint32_t(*SetDMAInterruptStateOfGIF[CHANNEL::COUNT])(DMAInterruptStateClearRegisterSettings&, uint32_t) =
+    {
+        &DMAInterruptStateClearRegisterSettings::GIF1::Set, &DMAInterruptStateClearRegisterSettings::GIF2::Set, &DMAInterruptStateClearRegisterSettings::GIF3::Set,
+        &DMAInterruptStateClearRegisterSettings::GIF4::Set, &DMAInterruptStateClearRegisterSettings::GIF5::Set, &DMAInterruptStateClearRegisterSettings::GIF6::Set,
+        &DMAInterruptStateClearRegisterSettings::GIF7::Set
+    };
+    constexpr static uint32_t(*SetDMAInterruptStateOfTCIF[CHANNEL::COUNT])(DMAInterruptStateClearRegisterSettings&, uint32_t) =
+    {
+        &DMAInterruptStateClearRegisterSettings::TCIF1::Set, &DMAInterruptStateClearRegisterSettings::TCIF2::Set, &DMAInterruptStateClearRegisterSettings::TCIF3::Set,
+        &DMAInterruptStateClearRegisterSettings::TCIF4::Set, &DMAInterruptStateClearRegisterSettings::TCIF5::Set, &DMAInterruptStateClearRegisterSettings::TCIF6::Set,
+        &DMAInterruptStateClearRegisterSettings::TCIF7::Set
+    };
+    constexpr static uint32_t(*SetDMAInterruptStateOfHTIF[CHANNEL::COUNT])(DMAInterruptStateClearRegisterSettings&, uint32_t) =
+    {
+        &DMAInterruptStateClearRegisterSettings::HTIF1::Set, &DMAInterruptStateClearRegisterSettings::HTIF2::Set, &DMAInterruptStateClearRegisterSettings::HTIF3::Set,
+        &DMAInterruptStateClearRegisterSettings::HTIF4::Set, &DMAInterruptStateClearRegisterSettings::HTIF5::Set, &DMAInterruptStateClearRegisterSettings::HTIF6::Set,
+        &DMAInterruptStateClearRegisterSettings::HTIF7::Set
+    };
+    constexpr static uint32_t(*SetDMAInterruptStateOfTEIF[CHANNEL::COUNT])(DMAInterruptStateClearRegisterSettings&, uint32_t) =
+    {
+        &DMAInterruptStateClearRegisterSettings::TEIF1::Set, &DMAInterruptStateClearRegisterSettings::TEIF2::Set, &DMAInterruptStateClearRegisterSettings::TEIF3::Set,
+        &DMAInterruptStateClearRegisterSettings::TEIF4::Set, &DMAInterruptStateClearRegisterSettings::TEIF5::Set, &DMAInterruptStateClearRegisterSettings::TEIF6::Set,
+        &DMAInterruptStateClearRegisterSettings::TEIF7::Set
+    };
+
+    struct ChannelConfigureRegisterSettings
+    {
+        uint32_t data;
+        using MEM2MEM = BitFieldObject<MaskRanger<14, 1>, ChannelConfigureRegisterSettings>;
+        using PL = BitFieldObject<MaskRanger<12, 2>, ChannelConfigureRegisterSettings>; // priority level 当前通道的优先级
+        using MSIZE = BitFieldObject<MaskRanger<10, 2>, ChannelConfigureRegisterSettings>; // Memory size 存储器数据宽度
+        using PSIZE = BitFieldObject<MaskRanger<8, 2>, ChannelConfigureRegisterSettings>; // Peripheral 外设数据宽度
+        using MINC = BitFieldObject<MaskRanger<7, 1>, ChannelConfigureRegisterSettings>; // Memory increase 是否对存储器数据地址增量
+        using PINC = BitFieldObject<MaskRanger<6, 1>, ChannelConfigureRegisterSettings>; // Peripheral increase 是否对外设数据地址进行增量
+        using CIRC = BitFieldObject<MaskRanger<5, 1>, ChannelConfigureRegisterSettings>; // Cirular mode 是否使用循环模式
+        using DIR = BitFieldObject<MaskRanger<4, 1>, ChannelConfigureRegisterSettings>; // Data transfer direction 数据传输的方向
+        using TEIE = BitFieldObject<MaskRanger<3, 1>, ChannelConfigureRegisterSettings>; // Transfer error interrupt enable 是否在传输异常时触发中断
+        using HTIE = BitFieldObject<MaskRanger<2, 1>, ChannelConfigureRegisterSettings>; // Half transfer interrupt enable 是否在传输过半时触发中断
+        using TCIE = BitFieldObject<MaskRanger<1, 1>, ChannelConfigureRegisterSettings>; // Transfer completed interrupt enable 是否在传输完成时触发中断
+        using EN = BitFieldObject<MaskRanger<0, 1>, ChannelConfigureRegisterSettings>; // Enable channel 是否启用通道
+    };
+    static_assert(sizeof(ChannelConfigureRegisterSettings) == sizeof(uint32_t));
+
+    struct ChannelNumberOfDataRegisterSettings
+    {
+        uint32_t data;
+        using NDT = BitFieldObject<MaskRanger<0, 16>, ChannelNumberOfDataRegisterSettings>; // number of data to transfer
+    };
+    static_assert(sizeof(ChannelNumberOfDataRegisterSettings) == sizeof(uint32_t));
+
+    struct ChannelPeripheralAddressRegisterSettings
+    {
+        uint32_t data;
+        using PA = BitFieldObject<MaskRanger<0, 32>, ChannelPeripheralAddressRegisterSettings>; // peripheral address
+    };
+    static_assert(sizeof(ChannelPeripheralAddressRegisterSettings) == sizeof(uint32_t));
+
+    struct ChannelMemoryAddressRegisterSettings
+    {
+        uint32_t data;
+        using MA = BitFieldObject<MaskRanger<0, 32>, ChannelMemoryAddressRegisterSettings>; // memory address
+    };
+    static_assert(sizeof(ChannelMemoryAddressRegisterSettings) == sizeof(uint32_t));
+
+    DMAInterruptStateRegisterSettings& getInterruptStateRegister() { return (*reinterpret_cast<DMAInterruptStateRegisterSettings*>(DMA_ISR_ADDR)); }
+    DMAInterruptStateClearRegisterSettings& getInterruptStateClearRegister() { return *(reinterpret_cast<DMAInterruptStateClearRegisterSettings*>(DMA_IFCR_ADDR)); }
+    ChannelConfigureRegisterSettings& getChannelConfigureRegister() { return (*reinterpret_cast<ChannelConfigureRegisterSettings*>(DMA_CCR_ADDRs[mChannel])); }
+    ChannelNumberOfDataRegisterSettings& getChannelNumberOfDataRegister() { return (*reinterpret_cast<ChannelNumberOfDataRegisterSettings*>(DMA_CNDTR_ADDRs[mChannel])); }
+    ChannelPeripheralAddressRegisterSettings& getChannelPeripheralAddressRegister() { return (*reinterpret_cast<ChannelPeripheralAddressRegisterSettings*>(DMA_CPAR_ADDRs[mChannel])); }
+    ChannelMemoryAddressRegisterSettings& getChannelMemoryAddressRegister() { return (*reinterpret_cast<ChannelMemoryAddressRegisterSettings*>(DMA_CMAR_ADDRs[mChannel])); }
+    DMA()
+     : mChannel(CHANNEL::COUNT) {}
+    DMA(CHANNEL channel)
+     : mChannel(channel) {}
+private:
+    CHANNEL mChannel;
+    MODE mMode;
+    BitWidth mBitWidthOfSource;
+    BitWidth mBitWidthOfDest;
+    uint32_t mSourceAddress;
+    uint32_t mDestAddress;
+};
+
 class RCC
 {
 public:
@@ -419,6 +635,7 @@ public:
     static constexpr uint32_t RCC_APB2ENR_REGISTER_ADDR = RCC_BASE_ADDR + 0x18u;
     static constexpr uint32_t RCC_APB1RSTR_REGISTER_ADDR = RCC_BASE_ADDR + 0x10u;
     static constexpr uint32_t RCC_APB2RSTR_REGISTER_ADDR = RCC_BASE_ADDR + 0x0cu;
+    static constexpr uint32_t RCC_AHBENR_REGISTER_ADDR = RCC_BASE_ADDR + 0x14u;
     // Controll register
     static constexpr uint32_t RCC_CR_ADDR = RCC_BASE_ADDR + 0x0u;
     // Clock configuration register
@@ -449,6 +666,11 @@ public:
      * @param enable: 是否需要使能
      */
     void EnableUSART(USART::PORT port, bool enable);
+    /**
+     * 是否启用DMA时钟
+     * @param enable: 是否使能 
+     */
+    void EnableDMA(bool enable);
     static RCC& GetInstance();
 private:
     struct ControlRegisterSettings
@@ -498,6 +720,9 @@ private:
     struct AHBPeripheralClockEnableRegisterSettings
     {
         uint32_t data;
+        using FLITFEN = BitFieldObject<MaskRanger<4, 1>, AHBPeripheralClockEnableRegisterSettings>;
+        using SRAMEN = BitFieldObject<MaskRanger<2, 1>, AHBPeripheralClockEnableRegisterSettings>;
+        using DMAEN = BitFieldObject<MaskRanger<0, 1>, AHBPeripheralClockEnableRegisterSettings>; // 是否激活DMA时钟
     };
     static_assert(sizeof(AHBPeripheralClockEnableRegisterSettings) == sizeof(uint32_t));
 

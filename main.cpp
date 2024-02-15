@@ -1,11 +1,13 @@
 #include <cstdint>
 #include <cstdlib>
 #include "MyHL.h"
+#include "MyCMSIS.h"
 
 int App();
 
 int main()
 {
+    NVIC_EnableIRQ(USART3_IRQn);
     RCC& rcc = RCC::GetInstance();
     rcc.InitClock();
     GPIO& gpioPA1 = GPIO::GetInstance(GPIO::PORT_GROUP::PG_A, 1);
@@ -15,9 +17,6 @@ int main()
     App();
     return 0;
 }
-
-#define SCB_BASE 0xE000E008
-#define SCB_HARD_FAULT_STATUS_REGISTER (*(volatile uint32_t *)(SCB_BASE + 0x2C))
 
 extern "C" int NMIHandler();
 int NMIHandler()
